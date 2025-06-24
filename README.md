@@ -1,6 +1,6 @@
 # Spotify Playlist LCD Anzeige
 
-Steuere deine Spotify Playlist auf einem LCD-Display mit Node-RED mit Skip-Funktion
+Steuere deine Spotify Playlist auf einem LCD-Display mit Node-RED mit Skip-Funktion und Reset-Funktion um an den Anfang zu kommen
 
 ## 🔧 Funktionsweise
 1. **Playlist-Abruf** via Spotify API
@@ -14,6 +14,8 @@ Steuere deine Spotify Playlist auf einem LCD-Display mit Node-RED mit Skip-Funkt
    - Zeile 2: Künstler
 4. **Skip-Funktion**
    - Manuelles Durchschalten per Button-Trigger
+5. **Reset-Funktion**
+   - Manuelles Reset per Button-Trigger
 
 ## 🛠 Hardware
 | Komponente          | Beschreibung                     |
