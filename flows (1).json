@@ -1,0 +1,461 @@
+[
+    {
+        "id": "5aa2814a779d1cf6",
+        "type": "tab",
+        "label": "Flow 5",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "70f051969d3da59b",
+        "type": "inject",
+        "z": "5aa2814a779d1cf6",
+        "name": "Trigger Playlist Fetch",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "",
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "fb3d50a04614ad1b"
+            ]
+        ]
+    },
+    {
+        "id": "fb3d50a04614ad1b",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "Get Spotify Token",
+        "func": "let client_id = \"c5670872a91347228dc0d1774b018ff4\";\nlet client_secret = \"9594e92512f54e96b5eb971b4df4e542\";\n\nlet credentials = Buffer.from(client_id + ':' + client_secret).toString('base64');\n\nmsg.headers = {\n    'Authorization': 'Basic ' + credentials,\n    'Content-Type': 'application/x-www-form-urlencoded'\n};\nmsg.payload = 'grant_type=client_credentials';\nmsg.method = 'POST';\nmsg.url = 'https://accounts.spotify.com/api/token';\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 320,
+        "y": 100,
+        "wires": [
+            [
+                "0624af8c7a0d9d63"
+            ]
+        ]
+    },
+    {
+        "id": "0624af8c7a0d9d63",
+        "type": "http request",
+        "z": "5aa2814a779d1cf6",
+        "name": "Request Token",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "https://accounts.spotify.com/api/token",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "x": 500,
+        "y": 100,
+        "wires": [
+            [
+                "58810178c31bc834"
+            ]
+        ]
+    },
+    {
+        "id": "58810178c31bc834",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "Store Token & Playlist URL",
+        "func": "try {\n    let data = JSON.parse(msg.payload);\n    if (data.access_token) {\n        flow.set(\"spotify_token\", data.access_token);\n    } else {\n        node.error(\"No access token\");\n        return null;\n    }\n} catch (e) {\n    node.error(\"Token parse error: \" + e.message);\n    return null;\n}\n\nlet playlistUrl = \"https://open.spotify.com/playlist/5YDePlIYSFgYSwx88asjlg?si=75013c8134524a2f&nd=1&dlsi=6d81d57cafd54214\";\nflow.set(\"playlisturl\", playlistUrl);\n\nmsg.payload = \"Ready to fetch playlist\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 720,
+        "y": 100,
+        "wires": [
+            [
+                "3c31df2a6f3472b8"
+            ]
+        ]
+    },
+    {
+        "id": "3c31df2a6f3472b8",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "Prepare Playlist Request",
+        "func": "let playlistUrl = flow.get(\"playlisturl\");\nif (!playlistUrl) {\n    node.error(\"No playlist URL\");\n    return null;\n}\n\nlet match = playlistUrl.match(/playlist\\/([a-zA-Z0-9]+)/);\nif (!match || !match[1]) {\n    node.error(\"Invalid playlist URL\");\n    return null;\n}\nlet playlistId = match[1];\n\nmsg.url = `https://api.spotify.com/v1/playlists/${playlistId}`;\n\nlet token = flow.get(\"spotify_token\");\nif (!token) {\n    node.error(\"No Spotify token\");\n    return null;\n}\n\nmsg.headers = { Authorization: \"Bearer \" + token };\nmsg.method = \"GET\";\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 970,
+        "y": 100,
+        "wires": [
+            [
+                "cb1b6cc0db734da9"
+            ]
+        ]
+    },
+    {
+        "id": "cb1b6cc0db734da9",
+        "type": "http request",
+        "z": "5aa2814a779d1cf6",
+        "name": "Fetch Playlist",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1190,
+        "y": 100,
+        "wires": [
+            [
+                "0a6e4e331cdee601",
+                "4e11aa95c0132901"
+            ]
+        ]
+    },
+    {
+        "id": "0a6e4e331cdee601",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "Process Songs",
+        "func": "let data = msg.payload;\n\nif (!data || !data.tracks || !data.tracks.items) {\n    node.error(\"No songs found\");\n    return null;\n}\n\n// Store all songs in flow context\nlet songs = data.tracks.items.map(item => ({\n    song: item.track.name,\n    artist: item.track.artists.map(a => a.name).join(\", \")\n}));\n\nflow.set(\"songs\", songs);\nflow.set(\"current_index\", 0);\n\n// Send first song\nmsg.payload = songs[0];\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1360,
+        "y": 100,
+        "wires": [
+            [
+                "666d6b96e35abe08",
+                "07e35324d5987baf"
+            ]
+        ]
+    },
+    {
+        "id": "04c2053d17528d94",
+        "type": "exec",
+        "z": "5aa2814a779d1cf6",
+        "command": "python /home/david/digilab/lcd/init.py",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Initialize LCD",
+        "x": 290,
+        "y": 200,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "666d6b96e35abe08",
+        "type": "change",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "input",
+                "pt": "msg",
+                "to": "payload.song",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1390,
+        "y": 160,
+        "wires": [
+            [
+                "9e4e3a60a12f2d35"
+            ]
+        ]
+    },
+    {
+        "id": "07e35324d5987baf",
+        "type": "change",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "input",
+                "pt": "msg",
+                "to": "payload.artist",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1390,
+        "y": 200,
+        "wires": [
+            [
+                "98d5f5f2f4f9c26b"
+            ]
+        ]
+    },
+    {
+        "id": "a6dcf986d9db05bd",
+        "type": "delay",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "pauseType": "delay",
+        "timeout": "0.5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 1690,
+        "y": 200,
+        "wires": [
+            [
+                "987fcee8b20b5ed9"
+            ]
+        ]
+    },
+    {
+        "id": "9e4e3a60a12f2d35",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "function 3",
+        "func": "msg.payload=msg.input\nmsg.line=1\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1540,
+        "y": 160,
+        "wires": [
+            [
+                "987fcee8b20b5ed9"
+            ]
+        ]
+    },
+    {
+        "id": "98d5f5f2f4f9c26b",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "function 4",
+        "func": "msg.payload=msg.input\nmsg.line=2\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1540,
+        "y": 200,
+        "wires": [
+            [
+                "a6dcf986d9db05bd"
+            ]
+        ]
+    },
+    {
+        "id": "987fcee8b20b5ed9",
+        "type": "template",
+        "z": "5aa2814a779d1cf6",
+        "name": "Build Write Command",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": " --line \"{{line}}\" --message \"{{payload}}\"",
+        "output": "str",
+        "x": 1860,
+        "y": 160,
+        "wires": [
+            [
+                "2428814a39ee8fbd"
+            ]
+        ]
+    },
+    {
+        "id": "2428814a39ee8fbd",
+        "type": "exec",
+        "z": "5aa2814a779d1cf6",
+        "command": "python /home/david/digilab/lcd/write.py",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Run Write Script",
+        "x": 1900,
+        "y": 220,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "b5726c9f5093f536",
+        "type": "inject",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1.5",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 200,
+        "wires": [
+            [
+                "04c2053d17528d94"
+            ]
+        ]
+    },
+    {
+        "id": "4e11aa95c0132901",
+        "type": "debug",
+        "z": "5aa2814a779d1cf6",
+        "name": "debug 17",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 720,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "0c73a673c0b84840",
+        "type": "function",
+        "z": "5aa2814a779d1cf6",
+        "name": "Skip to Next Song",
+        "func": "// Get current index and songs list\nlet currentIndex = flow.get(\"current_index\") || 0;\nlet songs = flow.get(\"songs\");\n\nif (!songs || songs.length === 0) {\n    node.error(\"No songs available\");\n    return null;\n}\n\n// Increment index and wrap around if needed\ncurrentIndex = (currentIndex + 1) % songs.length;\nflow.set(\"current_index\", currentIndex);\n\n// Get next song\nmsg.payload = songs[currentIndex];\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 670,
+        "y": 400,
+        "wires": [
+            [
+                "666d6b96e35abe08",
+                "07e35324d5987baf"
+            ]
+        ]
+    },
+    {
+        "id": "1d0c27fd6ebb6210",
+        "type": "rpi-gpio in",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "pin": "16",
+        "intype": "tri",
+        "debounce": "25",
+        "read": false,
+        "bcm": true,
+        "x": 210,
+        "y": 380,
+        "wires": [
+            [
+                "236ce9222ad48acd"
+            ]
+        ]
+    },
+    {
+        "id": "231a019052ebcd9d",
+        "type": "inject",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "4",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 1230,
+        "y": 60,
+        "wires": [
+            [
+                "0a6e4e331cdee601"
+            ]
+        ]
+    },
+    {
+        "id": "236ce9222ad48acd",
+        "type": "switch",
+        "z": "5aa2814a779d1cf6",
+        "name": "",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "regex",
+                "v": "1",
+                "vt": "str",
+                "case": false
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 410,
+        "y": 380,
+        "wires": [
+            [
+                "0c73a673c0b84840"
+            ]
+        ]
+    }
+]
